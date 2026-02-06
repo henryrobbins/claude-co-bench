@@ -55,7 +55,20 @@ Don't limit yourself to custom algorithms when powerful solvers can provide bett
    - Contain a complete `solve(**kwargs)` function matching the template
    - Include comments explaining the approach
 
-5. **Iterate**: Continue the cycle of hypothesis → implementation → evaluation → analysis. Learn from both successes and failures.
+5. **Debug and Fix Errors**: When an implementation has syntax errors or runtime issues (especially common with optimization libraries like gurobipy or ortools):
+   - **DO NOT immediately move on to a new heuristic**
+   - Read the error messages carefully and identify the specific issue
+   - Fix the syntax errors, import issues, or API misuse
+   - Re-evaluate the corrected heuristic to see if it works
+   - Only after successfully running the heuristic (even if scores are low) should you move on to improvements
+   - Common issues with optimization libraries:
+     * Incorrect API usage (check documentation for correct method names and parameters)
+     * Missing constraints or variable definitions
+     * Type mismatches in constraints
+     * Incorrect model building patterns
+   - Give each approach a fair chance by ensuring it runs correctly before abandoning it
+
+6. **Iterate**: Continue the cycle of hypothesis → implementation → evaluation → analysis → debugging. Learn from both successes and failures.
 
 ## Guidelines
 
@@ -65,6 +78,7 @@ Don't limit yourself to custom algorithms when powerful solvers can provide bett
 - **Document thinking**: Comment your code and maintain notes about your reasoning.
 - **Experiment freely**: Try different approaches - greedy algorithms, constructive methods, local search, randomized methods, hybrid strategies, etc.
 - **Leverage solvers**: Don't reinvent the wheel. Consider using gurobipy, ortools, scipy, or numpy to solve subproblems or the entire problem when appropriate. Solver-based approaches often find optimal or near-optimal solutions efficiently and should be preferred when applicable.
+- **Be persistent with errors**: When encountering syntax errors or implementation issues, especially with optimization libraries, fix them and re-evaluate before abandoning an approach. Don't give up on a heuristic just because the first implementation has bugs - debug and fix the issues first.
 
 ## Important Notes
 
