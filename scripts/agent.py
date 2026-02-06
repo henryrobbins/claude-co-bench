@@ -20,11 +20,23 @@ from typing import Optional
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
 from dotenv import load_dotenv
 
-from agent_prompts import SYSTEM_PROMPT
 from src.controller import TASK_LIST
 
 # Load environment variables
 load_dotenv()
+
+
+def load_system_prompt() -> str:
+    """Load the system prompt from the prompts directory."""
+    prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.txt"
+    return prompt_path.read_text()
+
+
+def load_initial_prompt(problem: str, run_dir: Path) -> str:
+    """Load and format the initial prompt from the prompts directory."""
+    prompt_path = Path(__file__).parent.parent / "prompts" / "initial_prompt.txt"
+    template = prompt_path.read_text()
+    return template.format(problem=problem, run_dir=run_dir.absolute())
 
 
 def setup_logging(run_dir: Path) -> logging.Logger:
@@ -110,27 +122,14 @@ async def run_agent(
     # Configure Claude SDK options
     options = ClaudeAgentOptions(
         permission_mode="bypassPermissions",
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=load_system_prompt(),
         allowed_tools=["Bash", "Read", "Write"],
         model="claude-haiku-4-5",
         max_turns=max_turns,
     )
 
-    # Initial prompt
-    initial_prompt = f"""You are working on the optimization problem: "{problem}"
-
-Your working directory is: {run_dir.absolute()}
-
-This directory already contains:
-- heuristics/ (empty, for you to save heuristics)
-- evaluation/ (empty, where evaluation results will be saved)
-
-Get started by:
-1. Using get_problem.py to understand the problem
-2. Creating a simple baseline heuristic
-3. Iterating to improve it
-
-Remember to use descriptive names for your heuristics (e.g., 01_greedy_baseline.py, 02_priority_scoring.py, etc.)."""
+    # Load initial prompt
+    initial_prompt = load_initial_prompt(problem, run_dir)
 
     try:
         # Run the agent
