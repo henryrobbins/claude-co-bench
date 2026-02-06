@@ -1,3 +1,5 @@
+# Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/evaluate.py
+
 from evaluation.utils import (
     FileLock,
     ParallelRun,

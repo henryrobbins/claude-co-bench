@@ -1,3 +1,5 @@
+# Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/controller.py
+
 from evaluation.utils import import_func, extract_function_source, list_test_cases
 from dataclasses import dataclass
 

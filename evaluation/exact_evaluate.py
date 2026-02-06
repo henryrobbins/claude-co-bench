@@ -1,3 +1,5 @@
+# Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/exact_evaluate.py
+
 from evaluation.utils import FileLock, ParallelRun, geo_men, filter_dev, filter_test
 import time
 from evaluation.evaluate import Evaluator

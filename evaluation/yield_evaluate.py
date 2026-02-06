@@ -1,3 +1,5 @@
+# Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/yield_evaluate.py
+
 from evaluation.evaluate import Evaluator, Feedback
 from evaluation.utils import (
     ParallelRun,

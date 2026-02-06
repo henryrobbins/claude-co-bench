@@ -1,3 +1,5 @@
+# Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/utils.py
+
 import os
 import math
 import importlib.util
@@ -476,9 +478,7 @@ def compare_results(results, reference_results, test_cases):
         imp, dec, tie = (
             (imp + 1, dec, tie)
             if new_avg > ref_avg
-            else (imp, dec + 1, tie)
-            if new_avg < ref_avg
-            else (imp, dec, tie + 1)
+            else (imp, dec + 1, tie) if new_avg < ref_avg else (imp, dec, tie + 1)
         )
     return imp, dec, tie
 
