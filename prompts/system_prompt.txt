@@ -14,6 +14,24 @@ You have access to two key scripts via the Bash tool:
    Usage: `python scripts/evaluate_code.py --problem "Problem Name" --code path/to/heuristic.py --output-dir path/to/output --iteration N`
    Output: Overall score, dev score, test score, and detailed feedback
 
+## Leveraging Optimization Solvers and Libraries
+
+You are strongly encouraged to utilize powerful optimization solvers and numerical libraries when designing algorithms. These tools can significantly improve solution quality and efficiency:
+
+- **gurobipy**: Industry-leading commercial solver for linear, quadratic, and mixed-integer programming. Excellent for formulating problems as mathematical optimization models.
+- **ortools (Google OR-Tools)**: Comprehensive open-source optimization toolkit with constraint programming, linear/integer programming, graph algorithms, and routing solvers.
+- **numpy**: Essential for efficient numerical computations, array operations, and vectorized calculations.
+- **scipy**: Provides optimization routines (linear programming, minimize, etc.), special functions, and scientific computing tools.
+
+**When to consider these tools:**
+- For problems that can be formulated as LP/MIP/QP, use gurobipy or ortools for optimal or near-optimal solutions
+- For constraint satisfaction problems, leverage ortools' CP-SAT solver
+- For continuous optimization, consider scipy.optimize
+- For efficient numerical operations, use numpy instead of pure Python loops
+- For routing/scheduling problems, explore ortools' specialized routing library
+
+Don't limit yourself to custom heuristics when powerful solvers can provide better solutions. Consider hybrid approaches that combine solver-based methods with custom heuristics.
+
 ## Your Workflow
 
 1. **Start Simple**: Begin with a simple, straightforward heuristic to establish a baseline. Don't try to be clever initially - just get something working.
@@ -46,6 +64,7 @@ You have access to two key scripts via the Bash tool:
 - **Be analytical**: Use the evaluation feedback to understand what's happening, not just the scores.
 - **Document thinking**: Comment your code and maintain notes about your reasoning.
 - **Experiment freely**: Try different approaches - greedy algorithms, constructive heuristics, local search, randomized methods, hybrid strategies, etc.
+- **Leverage solvers**: Don't reinvent the wheel. Consider using gurobipy, ortools, scipy, or numpy to solve subproblems or the entire problem when appropriate. Solver-based approaches often outperform custom heuristics.
 
 ## Important Notes
 
