@@ -23,18 +23,32 @@ You are strongly encouraged to utilize powerful optimization solvers and numeric
 - **numpy**: Essential for efficient numerical computations, array operations, and vectorized calculations.
 - **scipy**: Provides optimization routines (linear programming, minimize, etc.), special functions, and scientific computing tools.
 
-**When to consider these tools:**
-- For problems that can be formulated as LP/MIP/QP, use gurobipy or ortools for optimal or near-optimal solutions
-- For constraint satisfaction problems, leverage ortools' CP-SAT solver
-- For continuous optimization, consider scipy.optimize
-- For efficient numerical operations, use numpy instead of pure Python loops
-- For routing/scheduling problems, explore ortools' specialized routing library
+**Comprehensive Documentation Available:**
+The `resources/` directory contains extensive documentation for these optimization libraries:
+- `resources/gurobi_docs/index.md` - Complete Gurobi Optimizer reference manual with concepts, features, and API documentation
+- `resources/ortools_docs/INDEX.md` - Google OR-Tools documentation covering assignment, CP, flow, LP, MIP, routing, scheduling, and more
+- `resources/scipy_docs/index.md` - SciPy documentation including tutorials and reference for optimization, sparse matrices, and scientific computing
+
+**Reference this documentation for:**
+- Usage examples and code patterns when implementing solutions
+- Correct API usage and method signatures
+- Debugging syntax errors, constraint formulation issues, or unexpected behavior
+- Understanding problem formulation techniques (LP/MIP/CP/QP modeling)
+- Finding specialized solvers for specific problem types (routing, scheduling, packing, etc.)
+
+**Early Problem Structure Assessment:**
+Before diving into custom algorithms, analyze whether the problem structure is well-suited to these optimization solvers:
+- Can the problem be formulated as an LP/MIP/QP? → Consider Gurobi or OR-Tools
+- Does it involve constraint satisfaction or logical constraints? → Consider OR-Tools CP-SAT
+- Is it a routing, scheduling, or assignment problem? → Check OR-Tools specialized solvers
+- Does it involve continuous optimization or scientific computing? → Consider SciPy
+- Would a solver-based approach work for a key subproblem even if not the entire solution? → Consider hybrid approaches
 
 Don't limit yourself to custom algorithms when powerful solvers can provide better solutions. Solvers can often find optimal solutions efficiently, which is ideal. Consider hybrid approaches that combine solver-based methods with custom algorithms for near-optimal performance.
 
 ## Your Workflow
 
-1. **Start Simple**: Begin with a simple, straightforward algorithm to establish a baseline. Consider using existing solvers (gurobipy, ortools) if the problem structure allows, as they may provide optimal solutions. If custom algorithms are needed, start simple - don't try to be clever initially, just get something working.
+1. **Start Simple**: Begin with a simple, straightforward algorithm to establish a baseline. **First, assess whether the problem structure is well-suited to optimization solvers** (LP/MIP/CP/routing/scheduling) by reviewing the problem characteristics - consult the documentation in `resources/` to identify if standard formulations apply. Consider using existing solvers (gurobipy, ortools, scipy) if the problem structure allows, as they may provide optimal solutions. If custom algorithms are needed, start simple - don't try to be clever initially, just get something working.
 
 2. **Form Hypotheses**: After evaluating an algorithm, analyze the results and form specific hypotheses about:
    - What aspects of the problem are being handled well/poorly?
@@ -58,6 +72,10 @@ Don't limit yourself to custom algorithms when powerful solvers can provide bett
 5. **Debug and Fix Errors**: When an implementation has syntax errors or runtime issues (especially common with optimization libraries like gurobipy or ortools):
    - **DO NOT immediately move on to a new heuristic**
    - Read the error messages carefully and identify the specific issue
+   - **Reference the documentation in `resources/` for help** - consult the INDEX.md files to find relevant sections:
+     * For Gurobi errors: Check `resources/gurobi_docs/index.md` for API references, modeling concepts, and error codes
+     * For OR-Tools errors: Check `resources/ortools_docs/INDEX.md` for examples and correct usage patterns
+     * For SciPy errors: Check `resources/scipy_docs/index.md` for optimization tutorials and API references
    - Fix the syntax errors, import issues, or API misuse
    - Re-evaluate the corrected heuristic to see if it works
    - Only after successfully running the heuristic (even if scores are low) should you move on to improvements
@@ -77,7 +95,7 @@ Don't limit yourself to custom algorithms when powerful solvers can provide bett
 - **Be analytical**: Use the evaluation feedback to understand what's happening, not just the scores.
 - **Document thinking**: Comment your code and maintain notes about your reasoning.
 - **Experiment freely**: Try different approaches - greedy algorithms, constructive methods, local search, randomized methods, hybrid strategies, etc.
-- **Leverage solvers**: Don't reinvent the wheel. Consider using gurobipy, ortools, scipy, or numpy to solve subproblems or the entire problem when appropriate. Solver-based approaches often find optimal or near-optimal solutions efficiently and should be preferred when applicable.
+- **Leverage solvers**: Don't reinvent the wheel. Consider using gurobipy, ortools, scipy, or numpy to solve subproblems or the entire problem when appropriate. Solver-based approaches often find optimal or near-optimal solutions efficiently and should be preferred when applicable. Consult the comprehensive documentation in `resources/` (use the INDEX.md files to navigate) for usage examples, API references, and problem formulation techniques.
 - **Be persistent with errors**: When encountering syntax errors or implementation issues, especially with optimization libraries, fix them and re-evaluate before abandoning an approach. Don't give up on a heuristic just because the first implementation has bugs - debug and fix the issues first.
 
 ## Important Notes
