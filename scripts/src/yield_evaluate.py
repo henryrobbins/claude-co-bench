@@ -39,7 +39,7 @@ def format_concise_error(
 
 
 def evaluate_yielding_instance_in_subprocess(
-    instance: dict[str, Any], solve_source: str, config_path: str, queue: mp.Queue[Any]
+    instance: dict[str, Any], solve_source: str, config_path: str, queue: mp.Queue
 ) -> None:
     """
     Run evaluation inside a process and continuously send yielded solutions to the parent process.
@@ -190,7 +190,7 @@ class YieldingParallelRun(ParallelRun):
         instance: dict[str, Any],
         solve_source: str,
         config_path: str,
-        queue: mp.Queue[Any],
+        queue: mp.Queue,
     ) -> None:
         """
         Override the subprocess evaluation to handle yielding solve functions.

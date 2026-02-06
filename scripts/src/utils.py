@@ -162,7 +162,7 @@ class ParallelRun:
         instance: dict[str, Any],
         solve_source: str,
         config_path: str,
-        queue: mp.Queue[Any],
+        queue: mp.Queue,
     ) -> None:
         """
         Run evaluation inside a process and store its PID in a global variable
