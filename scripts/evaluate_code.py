@@ -5,6 +5,7 @@ Script to evaluate code for a given problem type and return feedback.
 Usage:
     python scripts/evaluate_code.py --problem "Aircraft landing" --code "path/to/solution.py"
     python scripts/evaluate_code.py --problem "TSP" --code "solution.py"
+    python scripts/evaluate_code.py --problem "TSP" --code "solution.py" --timeout 30
 """
 
 import argparse
@@ -120,6 +121,13 @@ def main() -> None:
         help="Iteration number for file naming (default: 0)",
     )
 
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=10,
+        help="Timeout in seconds for each test case (default: 10)",
+    )
+
     args = parser.parse_args()
 
     # Validate that code is provided
@@ -158,10 +166,10 @@ def main() -> None:
         )
 
         # Create evaluator with default settings
-        print("Creating evaluator...")
+        print(f"Creating evaluator with timeout={args.timeout}s...")
         evaluator = Evaluator(
             data=data,
-            timeout=10,
+            timeout=args.timeout,
             cpu_num=None,
             feedback_length=64,
         )

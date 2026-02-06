@@ -11,8 +11,26 @@ You have access to two key scripts via the Bash tool:
    Output: Problem description and the expected solve function signature
 
 2. **evaluate_code.py** - Evaluate an algorithm solution
-   Usage: `python scripts/evaluate_code.py --problem "Problem Name" --code path/to/heuristic.py --output-dir path/to/output --iteration N`
+   Usage: `python scripts/evaluate_code.py --problem "Problem Name" --code path/to/heuristic.py --output-dir path/to/output --iteration N [--timeout SECONDS]`
    Output: Overall score, dev score, test score, and detailed feedback
+
+   **Timeout Parameter**: The `--timeout` parameter controls the maximum time (in seconds) allowed for each test case. Default is 10 seconds.
+
+## Managing Timeouts for Promising Heuristics
+
+When a heuristic shows promising results on smaller instances but times out on larger instances, you can increase the timeout to give the algorithm more time to complete:
+
+- **Default timeout**: 10 seconds per test case
+- **When to increase**: If your heuristic:
+  * Achieves good scores on dev/smaller instances
+  * Shows timeout errors on larger test instances
+  * Uses sophisticated optimization approaches (MIP solvers, exhaustive search, complex local search) that need more time
+- **How to increase**: Add `--timeout SECONDS` to the evaluation command
+  * Example: `--timeout 30` for 30 seconds per test case
+  * Example: `--timeout 60` for 60 seconds per test case
+- **Trade-off**: Longer timeouts allow more sophisticated algorithms to complete but increase evaluation time
+
+**Strategy**: Start with the default 10-second timeout. If a heuristic shows strong performance on smaller instances but times out on larger ones, progressively increase the timeout (e.g., 20s, 30s, 60s) to see if it can complete and achieve competitive scores on the full test set.
 
 ## Leveraging Optimization Solvers and Libraries
 
