@@ -131,9 +131,26 @@ async def run_agent(
     # Load initial prompt
     initial_prompt = load_initial_prompt(problem, run_dir)
 
+    # Open transcript log file
+    transcript_path = run_dir / "transcript.log"
+
+    def write_to_transcript(content: str) -> None:
+        """Write content to transcript file and display to console."""
+        print(content)
+        with open(transcript_path, "a", encoding="utf-8") as f:
+            f.write(content + "\n")
+
     try:
         # Run the agent
         logger.info("Starting agent conversation...")
+
+        # Log initial prompt
+        write_to_transcript("\n" + "=" * 80)
+        write_to_transcript("USER PROMPT")
+        write_to_transcript("=" * 80)
+        write_to_transcript(initial_prompt)
+        write_to_transcript("")
+
         async with ClaudeSDKClient(options=options) as client:
             await client.query(prompt=initial_prompt)
 
@@ -142,12 +159,43 @@ async def run_agent(
             async for msg in client.receive_response():
                 if type(msg).__name__ == "AssistantMessage":
                     turn_count += 1
-                    logger.info(f"Turn {turn_count} completed")
+                    logger.info(f"Turn {turn_count} started")
+
+                    write_to_transcript("\n" + "=" * 80)
+                    write_to_transcript(f"ASSISTANT TURN {turn_count}")
+                    write_to_transcript("=" * 80)
+
                     for block in msg.content:
                         if type(block).__name__ == "TextBlock":
-                            # Log a snippet of the response
-                            text = block.text[:200]
-                            logger.info(f"Response preview: {text}...")
+                            # Display full text content
+                            write_to_transcript(block.text)
+                        elif type(block).__name__ == "ToolUseBlock":
+                            # Log tool use
+                            tool_info = f"\n[Tool Use: {block.name}]"
+                            write_to_transcript(tool_info)
+                            write_to_transcript(
+                                f"Input: {json.dumps(block.input, indent=2)}"
+                            )
+
+                    write_to_transcript("")
+                    logger.info(f"Turn {turn_count} completed")
+
+                elif type(msg).__name__ == "ToolResultMessage":
+                    # Log tool results
+                    write_to_transcript("\n" + "-" * 80)
+                    write_to_transcript("TOOL RESULTS")
+                    write_to_transcript("-" * 80)
+                    for block in msg.content:
+                        if type(block).__name__ == "ToolResultBlock":
+                            write_to_transcript(f"\n[Tool: {block.tool_use_id}]")
+                            if hasattr(block, "content"):
+                                if isinstance(block.content, str):
+                                    write_to_transcript(block.content)
+                                else:
+                                    write_to_transcript(
+                                        json.dumps(block.content, indent=2)
+                                    )
+                    write_to_transcript("")
 
             logger.info(f"Agent completed after {turn_count} turns")
 
@@ -163,6 +211,7 @@ async def run_agent(
         "problem": problem,
         "max_turns": max_turns,
         "end_time": datetime.now().isoformat(),
+        "total_turns": turn_count,
     }
 
     with open(run_dir / "summary.json", "w") as f:
@@ -172,6 +221,7 @@ async def run_agent(
     logger.info("AGENT COMPLETED")
     logger.info(f"{'='*80}")
     logger.info(f"Run directory: {run_dir}")
+    logger.info(f"Transcript saved to {transcript_path}")
     logger.info(f"Summary saved to {run_dir / 'summary.json'}")
 
 
