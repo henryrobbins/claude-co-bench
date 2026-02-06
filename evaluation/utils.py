@@ -14,41 +14,45 @@ from tqdm import tqdm
 import multiprocessing as mp
 import psutil
 import fcntl
+from typing import Any, Callable, Generator
+from types import TracebackType
 
 import cloudpickle
 from multiprocessing.reduction import ForkingPickler
 
 # Use cloudpickle to support pickling dynamic functions.
-ForkingPickler.dumps = cloudpickle.dumps
+ForkingPickler.dumps = cloudpickle.dumps  # type: ignore[method-assign]
 
 
 class TimeoutException(Exception):
     pass
 
 
-def timeout_handler(signum, frame):
+def timeout_handler(signum: int, frame: Any) -> None:
     raise TimeoutException("Execution time exceeded 60 seconds")
 
 
-def read_file(path):
+def read_file(path: str) -> str:
     return "".join([line for line in open(path)])
 
 
-def write_to_file(filename: str, content: str):
+def write_to_file(filename: str, content: str) -> None:
     with open(filename, "w", encoding="utf-8") as file:
         file.write(content)
 
 
-def import_func(path, *var_names):
+def import_func(path: str, *var_names: str) -> Generator[Any, None, None]:
     # Use the filename (without extension) as the module name.
     module_name = os.path.splitext(os.path.basename(path))[0]
     spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load module from {path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return (getattr(module, var) for var in var_names)
 
 
-def read_eval_file(file_path):
+def read_eval_file(file_path: str) -> str:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -59,29 +63,34 @@ def read_eval_file(file_path):
         return f"An error occurred while reading the file: {e}"
 
 
-def list_dirs(path="."):
+def list_dirs(path: str = ".") -> list[str]:
     return sorted([d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))])
 
 
-def list_test_cases(path="."):
+def list_test_cases(path: str = ".") -> list[str]:
     return sorted(
         f for f in os.listdir(path) if not (f.endswith(".py") or f == "__pycache__")
     )
 
 
 class FileLock:
-    def __init__(self, lock_file_path="cpu.lock"):
+    def __init__(self, lock_file_path: str = "cpu.lock") -> None:
         self.lock_file_path = lock_file_path
-        self.lock_file = None
+        self.lock_file: Any = None
 
-    def __enter__(self):
+    def __enter__(self) -> "FileLock":
         # Open (or create) the lock file
         self.lock_file = open(self.lock_file_path, "w")
         # Acquire an exclusive lock (this will block until the lock is available)
         fcntl.flock(self.lock_file, fcntl.LOCK_EX)
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         # Release the lock and close the file
         fcntl.flock(self.lock_file, fcntl.LOCK_UN)
         self.lock_file.close()
@@ -99,7 +108,9 @@ class CostTracker:
         return cls.total_cost_usd
 
 
-def call_llm(question: str, model="openai/gpt-4o", reasoning_effort=None) -> str:
+def call_llm(
+    question: str, model: str = "openai/gpt-4o", reasoning_effort: str | None = None
+) -> str:
     from litellm import completion
 
     messages = [{"content": question, "role": "user"}]
@@ -109,7 +120,7 @@ def call_llm(question: str, model="openai/gpt-4o", reasoning_effort=None) -> str
     return response.choices[0].message.content
 
 
-def extract_and_compile_code(llm_answer: str):
+def extract_and_compile_code(llm_answer: str) -> Callable[..., Any]:
     # This function is still useful for testing in the main process if needed.
     code_blocks = re.findall(r"```python(.*?)```", llm_answer, re.DOTALL)
     if not code_blocks:
@@ -117,7 +128,7 @@ def extract_and_compile_code(llm_answer: str):
     extracted_code = textwrap.dedent(code_blocks[0])
     if "def solve(" not in extracted_code:
         raise ValueError("Extracted code does not define a function named 'solve'.")
-    namespace = {}
+    namespace: dict[str, Any] = {}
     try:
         exec(extracted_code, namespace)
     except Exception as e:
@@ -145,8 +156,8 @@ def extract_function_source(file_path: str, function_name: str) -> str:
     raise ValueError(f"Function '{function_name}' not found in the file '{file_path}'.")
 
 
-def design_optimal(problem_cases, K):
-    def simulate(N, M):
+def design_optimal(problem_cases: dict[str, list[Any]], K: int) -> tuple[int, int]:
+    def simulate(N: int, M: int) -> int:
         slots = [0] * N
         for cases in problem_cases.values():
             t = math.ceil(len(cases) / M)
@@ -165,11 +176,11 @@ def design_optimal(problem_cases, K):
         if total_time < best_time or (total_time == best_time and N < best_N):
             best_time, best_N, best_M = total_time, N, M
 
-    return best_N, best_M
+    return best_N, best_M  # type: ignore[return-value]
 
 
 @contextlib.contextmanager
-def capture_all_output():
+def capture_all_output() -> Generator[io.StringIO, None, None]:
     buffer = io.StringIO()
     # Save the original stdout and stderr
     old_stdout, old_stderr = sys.stdout, sys.stderr
@@ -191,12 +202,16 @@ def capture_all_output():
 
 
 class ParallelRun:
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         self.func = func
 
     def evaluate_instance_in_subprocess(
-        self, instance, solve_source, config_path, queue
-    ):
+        self,
+        instance: dict[str, Any],
+        solve_source: str,
+        config_path: str,
+        queue: mp.Queue[Any],
+    ) -> None:
         """
         Run evaluation inside a process and store its PID in a global variable
         so we can identify its children later if needed.
@@ -222,7 +237,13 @@ class ParallelRun:
         except Exception as e:
             queue.put(f"Exception: {str(e)}")
 
-    def run_instance_with_timeout(self, instance, solve_source, config_path, timeout):
+    def run_instance_with_timeout(
+        self,
+        instance: dict[str, Any],
+        solve_source: str,
+        config_path: str,
+        timeout: int,
+    ) -> Any:
         # Create a unique cgroup name for this instance.
         # (You might use a unique identifier from the instance or the process PID)
         cgroup_name = f"experiment_{os.getpid()}_{instance.get('id', 'unknown')}"
@@ -272,15 +293,15 @@ class ParallelRun:
 
     def process_single_case(
         self,
-        case,
-        task,
-        load_data,
-        solve_source,
-        config_path,
-        src_dir,
-        timeout,
-        instance_workers,
-    ):
+        case: str,
+        task: str,
+        load_data: Callable[[str], list[dict[str, Any]]],
+        solve_source: str,
+        config_path: str,
+        src_dir: str,
+        timeout: int,
+        instance_workers: int,
+    ) -> tuple[str, tuple[list[Any], None]]:
         # print(case)
         file_path = os.path.join(src_dir, task, case)
         list_of_instance = load_data(file_path)
@@ -314,16 +335,16 @@ class ParallelRun:
 
     def process_all_cases(
         self,
-        test_cases,
-        task,
-        load_data,
-        solve_source,
-        config_path,
-        src_dir,
-        timeout=60,
-        instance_workers=4,
-        case_workers=4,
-    ):
+        test_cases: list[str],
+        task: str,
+        load_data: Callable[[str], list[dict[str, Any]]],
+        solve_source: str,
+        config_path: str,
+        src_dir: str,
+        timeout: int = 60,
+        instance_workers: int = 4,
+        case_workers: int = 4,
+    ) -> dict[str, tuple[list[Any], str | None]]:
         results = {}
         pbar = tqdm(
             total=len(test_cases), desc=f"Processing cases for '{task}'", unit="case"
@@ -360,16 +381,16 @@ class ParallelRun:
 
     def __call__(
         self,
-        test_cases,
-        task,
-        load_data,
-        solve_source,
-        config_path,
-        src_dir,
-        timeout=60,
-        instance_workers=4,
-        case_workers=4,
-    ):
+        test_cases: list[str],
+        task: str,
+        load_data: Callable[[str], list[dict[str, Any]]],
+        solve_source: str,
+        config_path: str,
+        src_dir: str,
+        timeout: int = 60,
+        instance_workers: int = 4,
+        case_workers: int = 4,
+    ) -> dict[str, tuple[list[Any], str | None]]:
         return self.process_all_cases(
             test_cases,
             task,
@@ -383,7 +404,9 @@ class ParallelRun:
         )
 
 
-def filter_dev(results, dev):
+def filter_dev(
+    results: dict[str, tuple[list[Any], str | None]], dev: dict[str, list[int]] | None
+) -> dict[str, tuple[list[Any], str | None]]:
     if dev is None:
         return results
     dev_results = {}
@@ -402,7 +425,9 @@ def filter_dev(results, dev):
     return dev_results
 
 
-def filter_test(results, dev):
+def filter_test(
+    results: dict[str, tuple[list[Any], str | None]], dev: dict[str, list[int]] | None
+) -> dict[str, tuple[list[Any], str | None]]:
     if dev is None:
         return results
     test_results = {}
@@ -422,7 +447,9 @@ def filter_test(results, dev):
     return test_results
 
 
-def average_score(results, test_cases):
+def average_score(
+    results: dict[str, tuple[list[Any], str | None]], test_cases: list[str]
+) -> float:
     return sum(
         (
             sum(x if not isinstance(x, str) else 0 for x in scores) / len(scores)
@@ -435,7 +462,9 @@ def average_score(results, test_cases):
     ) / len(results)
 
 
-def geo_men(results, test_cases):
+def geo_men(
+    results: dict[str, tuple[list[Any], str | None]], test_cases: list[str]
+) -> float:
     per_case_gms = []
     for case in results.keys():
         scores, error_message = results.get(case, (None, "No result"))
@@ -460,7 +489,11 @@ def geo_men(results, test_cases):
     return total_prod ** (1.0 / n)
 
 
-def compare_results(results, reference_results, test_cases):
+def compare_results(
+    results: dict[str, tuple[list[Any], str | None]],
+    reference_results: dict[str, tuple[list[Any], str | None]],
+    test_cases: list[str],
+) -> tuple[int, int, int]:
     imp = dec = tie = 0
     for case in test_cases:
         new, new_err = results.get(case, (None, "No result"))
@@ -483,7 +516,7 @@ def compare_results(results, reference_results, test_cases):
     return imp, dec, tie
 
 
-def extract_code_blocks(response):
+def extract_code_blocks(response: str) -> list[str]:
     pattern_backticks = r"```python\s*(.*?)\s*```"
     pattern_dashes = r"^-{3,}\s*\n(.*?)\n-{3,}"
     blocks = re.findall(pattern_backticks, response, re.DOTALL)

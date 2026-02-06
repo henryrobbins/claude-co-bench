@@ -4,6 +4,7 @@ from evaluation.utils import FileLock, ParallelRun, geo_men, filter_dev, filter_
 import time
 from evaluation.evaluate import Evaluator
 from dataclasses import dataclass
+from typing import Any, Callable
 
 
 @dataclass
@@ -17,7 +18,11 @@ class Feedback:
     results: dict
 
 
-def separate_time(results):
+def separate_time(
+    results: dict[str, tuple[list[Any], str | None]],
+) -> tuple[
+    dict[str, tuple[list[Any], str | None]], dict[str, tuple[list[Any], str | None]]
+]:
     returned_scores = {}
     times = {}
     for case, (scores, error_message) in results.items():
@@ -35,7 +40,9 @@ def separate_time(results):
     return returned_scores, times
 
 
-def optimal_filter(results):
+def optimal_filter(
+    results: dict[str, tuple[list[Any], str | None]],
+) -> dict[str, tuple[list[Any], str | None]]:
     normed = {}
     for case, (scores, error_message) in results.items():
         normed_scores = []
@@ -48,7 +55,10 @@ def optimal_filter(results):
     return normed
 
 
-def filter_time(score_results, time_results):
+def filter_time(
+    score_results: dict[str, tuple[list[Any], str | None]],
+    time_results: dict[str, tuple[list[Any], str | None]],
+) -> dict[str, tuple[list[Any], str | None]]:
     normed = {}
     for case in score_results:
         scores, error_message = score_results[case]
@@ -66,7 +76,9 @@ def filter_time(score_results, time_results):
     return normed
 
 
-def evaluate_instance(instance, solve, eval_func):
+def evaluate_instance(
+    instance: dict[str, Any], solve: Callable[..., Any], eval_func: Callable[..., Any]
+) -> list[Any]:
     """Run solve and eval_func on the instance and return the score."""
     start_time = time.time()
     solution = solve(**instance)
@@ -77,7 +89,7 @@ def evaluate_instance(instance, solve, eval_func):
 
 
 class ExactEvaluator(Evaluator):
-    def evaluate(self, code):
+    def evaluate(self, code: str) -> Feedback:
         runtime = ParallelRun(evaluate_instance)
         with FileLock():
             results = runtime(

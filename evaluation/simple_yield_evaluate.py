@@ -3,6 +3,7 @@
 from evaluation.evaluate import Evaluator, Feedback
 from evaluation.utils import import_func, average_score, filter_dev, filter_test
 import os
+from typing import Any, Callable
 
 
 class SimpleYieldingEvaluator(Evaluator):
@@ -11,7 +12,13 @@ class SimpleYieldingEvaluator(Evaluator):
     It collects the last solution yielded before timeout and evaluates it.
     """
 
-    def evaluate_yielding_instance(self, instance, solve, eval_func, timeout=10):
+    def evaluate_yielding_instance(
+        self,
+        instance: dict[str, Any],
+        solve: Callable[..., Any],
+        eval_func: Callable[..., Any],
+        timeout: int = 10,
+    ) -> Any:
         """
         Run solve (as a generator) and collect yielded solutions until timeout.
         Then evaluate the last solution.
@@ -40,7 +47,7 @@ class SimpleYieldingEvaluator(Evaluator):
         # print(score)
         return score
 
-    def evaluate(self, code):
+    def evaluate(self, code: str) -> Feedback:
         # Compile the solve function
         namespace = {}
         print(code)

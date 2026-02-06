@@ -7,7 +7,11 @@ authors = [
 description = "Claude CO-Bench evaluation framework"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "tqdm>=4.66.0",
+    "psutil>=5.9.0",
+    "cloudpickle>=3.0.0",
+]
 
 [dependency-groups]
 dev = [

@@ -15,9 +15,12 @@ import psutil
 import traceback
 import sys
 import re
+from typing import Any
 
 
-def format_concise_error(exc_type, exc_value, exc_traceback):
+def format_concise_error(
+    exc_type: type[BaseException], exc_value: BaseException, exc_traceback: Any
+) -> str:
     """Format a concise error message with just the essential information."""
     # Get the full traceback as a string
     tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -36,8 +39,8 @@ def format_concise_error(exc_type, exc_value, exc_traceback):
 
 
 def evaluate_yielding_instance_in_subprocess(
-    instance, solve_source, config_path, queue
-):
+    instance: dict[str, Any], solve_source: str, config_path: str, queue: mp.Queue[Any]
+) -> None:
     """
     Run evaluation inside a process and continuously send yielded solutions to the parent process.
     """
@@ -73,7 +76,9 @@ def evaluate_yielding_instance_in_subprocess(
         queue.put(("error", f"Exception in setup: {error_message}"))
 
 
-def run_yielding_instance_with_timeout(instance, solve_source, config_path, timeout):
+def run_yielding_instance_with_timeout(
+    instance: dict[str, Any], solve_source: str, config_path: str, timeout: int
+) -> Any:
     """
     Run instance with timeout, collecting yielded solutions from the subprocess.
     After the subprocess finishes or times out, evaluate the last solution.
@@ -130,7 +135,7 @@ def run_yielding_instance_with_timeout(instance, solve_source, config_path, time
     # Create a thread to do the queue fetching with the original code
     import threading
 
-    def fetch_from_queue():
+    def fetch_from_queue() -> None:
         """Fetch remaining data from the queue using the original method."""
         nonlocal last_solution, error
         try:
@@ -176,12 +181,16 @@ def run_yielding_instance_with_timeout(instance, solve_source, config_path, time
 
 
 class YieldingParallelRun(ParallelRun):
-    def __init__(self, *args, **kwargs):
-        super().__init__(None, *args, **kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(None, *args, **kwargs)  # type: ignore[arg-type]
 
     def evaluate_instance_in_subprocess(
-        self, instance, solve_source, config_path, queue
-    ):
+        self,
+        instance: dict[str, Any],
+        solve_source: str,
+        config_path: str,
+        queue: mp.Queue[Any],
+    ) -> None:
         """
         Override the subprocess evaluation to handle yielding solve functions.
         """
@@ -189,7 +198,13 @@ class YieldingParallelRun(ParallelRun):
             instance, solve_source, config_path, queue
         )
 
-    def run_instance_with_timeout(self, instance, solve_source, config_path, timeout):
+    def run_instance_with_timeout(
+        self,
+        instance: dict[str, Any],
+        solve_source: str,
+        config_path: str,
+        timeout: int,
+    ) -> Any:
         """
         Override the timeout handling to collect yielded solutions.
         """
@@ -204,10 +219,18 @@ class YieldingEvaluator(Evaluator):
     It collects the last solution yielded before timeout and evaluates it after the timeout.
     """
 
-    def __init__(self, data, timeout=10, cpu_num=None, feedback_length=64):
+    def __init__(
+        self,
+        data: Any,
+        timeout: int = 10,
+        cpu_num: int | None = None,
+        feedback_length: int = 64,
+    ) -> None:
         super().__init__(data, timeout, cpu_num, feedback_length)
 
-    def get_feedback(self, results, avg_score):
+    def get_feedback(
+        self, results: dict[str, tuple[list[Any], str | None]], avg_score: float
+    ) -> str:
         grouped = {}
         for case, (scores, err) in results.items():
             key = case.split("/", 1)[0] if "/" in case else case
@@ -235,7 +258,7 @@ class YieldingEvaluator(Evaluator):
         summary += f"\nAvg Score {avg_score}"
         return summary
 
-    def evaluate(self, code):
+    def evaluate(self, code: str) -> Feedback:
         runtime = YieldingParallelRun()
         results = runtime(
             self.data.test_cases,

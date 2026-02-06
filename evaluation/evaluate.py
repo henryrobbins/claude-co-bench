@@ -10,6 +10,7 @@ from evaluation.utils import (
 )
 import os
 from dataclasses import dataclass
+from typing import Any, Callable
 
 
 @dataclass
@@ -23,7 +24,9 @@ class Feedback:
     results: dict
 
 
-def evaluate_instance(instance, solve, eval_func):
+def evaluate_instance(
+    instance: dict[str, Any], solve: Callable[..., Any], eval_func: Callable[..., Any]
+) -> Any:
     """Run solve and eval_func on the instance and return the score."""
     solution = solve(**instance)
     solution = {str(k): v for k, v in solution.items()}
@@ -32,7 +35,13 @@ def evaluate_instance(instance, solve, eval_func):
 
 
 class Evaluator:
-    def __init__(self, data, timeout=10, cpu_num=None, feedback_length=64):
+    def __init__(
+        self,
+        data: Any,
+        timeout: int = 10,
+        cpu_num: int | None = None,
+        feedback_length: int = 64,
+    ) -> None:
         self.data = data
         self.timeout = timeout
         data_size = {case: [1] * 1 for case in self.data.test_cases}
@@ -44,7 +53,9 @@ class Evaluator:
         print(self.case_workers, self.instance_workers)
         self.feedback_length = feedback_length
 
-    def get_feedback(self, results, avg_score):
+    def get_feedback(
+        self, results: dict[str, tuple[list[Any], str | None]], avg_score: float
+    ) -> str:
         prev_score = []
         for case in results.keys():
             scores, error_message = results.get(case, (None, "No result"))
@@ -62,7 +73,7 @@ class Evaluator:
         prev_score += f"\nAvg Score {avg_score}"
         return prev_score
 
-    def evaluate(self, code):
+    def evaluate(self, code: str) -> Feedback:
         runtime = ParallelRun(evaluate_instance)
         with FileLock():
             results = runtime(

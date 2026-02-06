@@ -2,6 +2,7 @@
 
 from evaluation.utils import import_func, extract_function_source, list_test_cases
 from dataclasses import dataclass
+from typing import Callable, Any
 
 
 @dataclass
@@ -14,7 +15,7 @@ class Data:
     norm_score: str
     get_dev: str
     task: str
-    load_data: callable
+    load_data: Callable[..., Any]
     src_dir: str
     norm_time: str
 
@@ -59,7 +60,7 @@ TASK_LIST = [
 ]
 
 
-def get_data(task, src_dir="data"):
+def get_data(task: str, src_dir: str = "data") -> Data:
     load_data, _, problem = import_func(
         f"{src_dir}/{task}/config.py", "load_data", "eval_func", "DESCRIPTION"
     )
@@ -102,7 +103,9 @@ def get_data(task, src_dir="data"):
 from pathlib import Path
 
 
-def list_new_test_cases(path=".", filter_key=None):
+def list_new_test_cases(
+    path: str = ".", filter_key: list[str] | None = None
+) -> list[str]:
     """
     Recursively list all files under *path* that are **not**
     Python source files, solution/parallel artifacts, or __pycache__.
@@ -126,7 +129,12 @@ def list_new_test_cases(path=".", filter_key=None):
     )
 
 
-def get_new_data(task, src_dir="data", data_dir="data", filter_key=None):
+def get_new_data(
+    task: str,
+    src_dir: str = "data",
+    data_dir: str = "data",
+    filter_key: list[str] | None = None,
+) -> Data:
     load_data, _, problem = import_func(
         f"{src_dir}/{task}/config.py", "load_data", "eval_func", "DESCRIPTION"
     )
