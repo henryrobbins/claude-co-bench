@@ -1,10 +1,10 @@
 # Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/evaluate.py
 
+import math
 from evaluation.controller import Data
 from evaluation.utils import (
     FileLock,
     ParallelRun,
-    design_optimal,
     average_score,
     filter_dev,
     filter_test,
@@ -48,7 +48,7 @@ class Evaluator:
         data_size = {case: [1] * 1 for case in self.data.test_cases}
         # data_size = {case: [1] * len(
         #     self.data.load_data(f"{self.data.src_dir}/{self.data.task}/{case}")) for case in self.data.test_cases}
-        cpu_num = os.cpu_count() if cpu_num is None else cpu_num
+        cpu_num = os.cpu_count() or 1 if cpu_num is None else cpu_num
         self.case_workers, self.instance_workers = design_optimal(data_size, cpu_num)
         self.case_workers = cpu_num
         print(self.case_workers, self.instance_workers)
@@ -113,3 +113,30 @@ class Evaluator:
             test_feedback=test_feedback,
             results=results,
         )
+
+
+def design_optimal(problem_cases: dict[str, list[Any]], K: int) -> tuple[int, int]:
+
+    def simulate(N: int, M: int) -> int:
+        slots = [0] * N
+        for cases in problem_cases.values():
+            t = math.ceil(len(cases) / M)
+            slots[slots.index(min(slots))] += t
+        return max(slots)
+
+    N = 1
+    M = K // N
+    total_time = simulate(N, M)
+    best_time, best_N, best_M = total_time, N, M
+    P = len(problem_cases)
+
+    for N in range(1, P + 1):
+        M = K // N
+        if M < 1:
+            continue
+        total_time = simulate(N, M)
+        # Prefer smaller N if total_time is the same
+        if total_time < best_time or (total_time == best_time and N < best_N):
+            best_time, best_N, best_M = total_time, N, M
+
+    return best_N, best_M

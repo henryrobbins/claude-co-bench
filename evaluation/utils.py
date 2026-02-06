@@ -131,29 +131,6 @@ def extract_and_compile_code(llm_answer: str) -> Callable[..., Any]:
     return namespace["solve"]
 
 
-def design_optimal(problem_cases: dict[str, list[Any]], K: int) -> tuple[int, int]:
-    def simulate(N: int, M: int) -> int:
-        slots = [0] * N
-        for cases in problem_cases.values():
-            t = math.ceil(len(cases) / M)
-            slots[slots.index(min(slots))] += t
-        return max(slots)
-
-    best_time, best_N, best_M = float("inf"), None, None
-    P = len(problem_cases)
-
-    for N in range(1, P + 1):
-        M = K // N
-        if M < 1:
-            continue
-        total_time = simulate(N, M)
-        # Prefer smaller N if total_time is the same
-        if total_time < best_time or (total_time == best_time and N < best_N):
-            best_time, best_N, best_M = total_time, N, M
-
-    return best_N, best_M  # type: ignore[return-value]
-
-
 @contextlib.contextmanager
 def capture_all_output() -> Generator[io.StringIO, None, None]:
     buffer = io.StringIO()
