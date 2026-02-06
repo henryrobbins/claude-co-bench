@@ -1,8 +1,8 @@
 # Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/evaluate.py
 
 import math
-from evaluation.controller import Data
-from evaluation.utils import (
+from src.controller import Data
+from src.utils import (
     FileLock,
     ParallelRun,
     average_score,

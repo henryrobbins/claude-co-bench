@@ -1,7 +1,7 @@
 # Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/simple_yield_evaluate.py
 
-from evaluation.evaluate import Evaluator, Feedback
-from evaluation.utils import import_func, average_score, filter_dev, filter_test
+from src.evaluate import Evaluator, Feedback
+from src.utils import import_func, average_score, filter_dev, filter_test
 import os
 from typing import Any, Callable
 

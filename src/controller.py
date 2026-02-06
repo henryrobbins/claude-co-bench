@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Any
 
-from evaluation.utils import import_func
+from src.utils import import_func
 
 
 @dataclass
