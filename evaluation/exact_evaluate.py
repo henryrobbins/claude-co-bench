@@ -1,7 +1,8 @@
-from evaluation.utils import FileLock, ParallelRun, design_optimal, average_score, geo_men, filter_dev, filter_test
+from evaluation.utils import FileLock, ParallelRun, geo_men, filter_dev, filter_test
 import time
 from evaluation.evaluate import Evaluator
 from dataclasses import dataclass
+
 
 @dataclass
 class Feedback:
@@ -78,9 +79,16 @@ class ExactEvaluator(Evaluator):
         runtime = ParallelRun(evaluate_instance)
         with FileLock():
             results = runtime(
-                self.data.test_cases, self.data.task, self.data.load_data, code,
-                self.data.config_path, self.data.src_dir,
-                timeout=self.timeout, instance_workers=self.instance_workers, case_workers=self.case_workers)
+                self.data.test_cases,
+                self.data.task,
+                self.data.load_data,
+                code,
+                self.data.config_path,
+                self.data.src_dir,
+                timeout=self.timeout,
+                instance_workers=self.instance_workers,
+                case_workers=self.case_workers,
+            )
 
         score_results, time_results = separate_time(results)
         score_results = self.data.norm_score(score_results)
@@ -90,12 +98,20 @@ class ExactEvaluator(Evaluator):
         final_results = filter_time(optimal_results, time_results)
 
         score = geo_men(final_results, self.data.test_cases)
-        dev_score = geo_men(filter_dev(final_results, self.data.get_dev()), self.data.test_cases)
-        test_score = geo_men(filter_test(final_results, self.data.get_dev()), self.data.test_cases)
+        dev_score = geo_men(
+            filter_dev(final_results, self.data.get_dev()), self.data.test_cases
+        )
+        test_score = geo_men(
+            filter_test(final_results, self.data.get_dev()), self.data.test_cases
+        )
 
         feedback = self.get_feedback(final_results, dev_score)
-        dev_feedback = self.get_feedback(filter_dev(final_results, self.data.get_dev()), dev_score)
-        test_feedback = self.get_feedback(filter_test(final_results, self.data.get_dev()), test_score)
+        dev_feedback = self.get_feedback(
+            filter_dev(final_results, self.data.get_dev()), dev_score
+        )
+        test_feedback = self.get_feedback(
+            filter_test(final_results, self.data.get_dev()), test_score
+        )
 
         return Feedback(
             score=score,

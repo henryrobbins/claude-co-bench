@@ -1,5 +1,11 @@
 from evaluation.evaluate import Evaluator, Feedback
-from evaluation.utils import FileLock, ParallelRun, average_score, filter_dev, filter_test, import_func
+from evaluation.utils import (
+    ParallelRun,
+    average_score,
+    filter_dev,
+    filter_test,
+    import_func,
+)
 import time
 import os
 import multiprocessing as mp
@@ -7,7 +13,6 @@ import psutil
 import traceback
 import sys
 import re
-import signal
 
 
 def format_concise_error(exc_type, exc_value, exc_traceback):
@@ -19,7 +24,7 @@ def format_concise_error(exc_type, exc_value, exc_traceback):
     for line in tb_lines:
         if ", in solve" in line:
             # Extract file, line number and function name
-            match = re.search(r'line (\d+), in (\w+)', line)
+            match = re.search(r"line (\d+), in (\w+)", line)
             if match:
                 line_num, func_name = match.groups()
                 return f"line {line_num}, in {func_name} {exc_type.__name__}: {str(exc_value)}"
@@ -28,17 +33,19 @@ def format_concise_error(exc_type, exc_value, exc_traceback):
     return f"{exc_type.__name__}: {str(exc_value)}"
 
 
-def evaluate_yielding_instance_in_subprocess(instance, solve_source, config_path, queue):
+def evaluate_yielding_instance_in_subprocess(
+    instance, solve_source, config_path, queue
+):
     """
     Run evaluation inside a process and continuously send yielded solutions to the parent process.
     """
     try:
         # Set process group ID to make it easier to kill all children later
-        if hasattr(os, 'setpgrp'):  # Unix/Linux/Mac
+        if hasattr(os, "setpgrp"):  # Unix/Linux/Mac
             os.setpgrp()
 
         # Re-import eval_func from the config file
-        _, eval_func = import_func(config_path, 'load_data', 'eval_func')
+        _, eval_func = import_func(config_path, "load_data", "eval_func")
 
         # Compile the solve function from its source code
         local_namespace = {}
@@ -52,12 +59,12 @@ def evaluate_yielding_instance_in_subprocess(instance, solve_source, config_path
         try:
             for solution in solve_func(**instance):
                 queue.put(("solution", solution))
-        except Exception as e:
+        except Exception:
             # Get concise error message
             exc_type, exc_value, exc_traceback = sys.exc_info()
             error_message = format_concise_error(exc_type, exc_value, exc_traceback)
             queue.put(("error", f"Exception during solving: {error_message}"))
-    except Exception as e:
+    except Exception:
         # Get concise error message for setup errors
         exc_type, exc_value, exc_traceback = sys.exc_info()
         error_message = format_concise_error(exc_type, exc_value, exc_traceback)
@@ -70,8 +77,10 @@ def run_yielding_instance_with_timeout(instance, solve_source, config_path, time
     After the subprocess finishes or times out, evaluate the last solution.
     """
     queue = mp.Queue()
-    p = mp.Process(target=evaluate_yielding_instance_in_subprocess,
-                   args=(instance, solve_source, config_path, queue))
+    p = mp.Process(
+        target=evaluate_yielding_instance_in_subprocess,
+        args=(instance, solve_source, config_path, queue),
+    )
     p.start()
 
     last_solution = None
@@ -145,7 +154,7 @@ def run_yielding_instance_with_timeout(instance, solve_source, config_path, time
     # If we have a last solution, evaluate it
     if last_solution is not None:
         # Re-import eval_func from the config file
-        _, eval_func = import_func(config_path, 'load_data', 'eval_func')
+        _, eval_func = import_func(config_path, "load_data", "eval_func")
 
         # Convert to string keys for consistency
         last_solution = {str(k): v for k, v in last_solution.items()}
@@ -154,7 +163,7 @@ def run_yielding_instance_with_timeout(instance, solve_source, config_path, time
         try:
             score = eval_func(**instance, **last_solution)
             return score
-        except Exception as e:
+        except Exception:
             # Get full traceback for evaluation errors
             exc_type, exc_value, exc_traceback = sys.exc_info()
             error_message = f"{exc_type.__name__}: {str(exc_value)}"
@@ -168,17 +177,23 @@ class YieldingParallelRun(ParallelRun):
     def __init__(self, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
 
-    def evaluate_instance_in_subprocess(self, instance, solve_source, config_path, queue):
+    def evaluate_instance_in_subprocess(
+        self, instance, solve_source, config_path, queue
+    ):
         """
         Override the subprocess evaluation to handle yielding solve functions.
         """
-        evaluate_yielding_instance_in_subprocess(instance, solve_source, config_path, queue)
+        evaluate_yielding_instance_in_subprocess(
+            instance, solve_source, config_path, queue
+        )
 
     def run_instance_with_timeout(self, instance, solve_source, config_path, timeout):
         """
         Override the timeout handling to collect yielded solutions.
         """
-        return run_yielding_instance_with_timeout(instance, solve_source, config_path, timeout)
+        return run_yielding_instance_with_timeout(
+            instance, solve_source, config_path, timeout
+        )
 
 
 class YieldingEvaluator(Evaluator):
@@ -206,9 +221,13 @@ class YieldingEvaluator(Evaluator):
         lines = []
         for key, data in grouped.items():
             if data["scores"]:
-                lines.append(f"{key} -> Scores: {data['scores'][:self.feedback_length]}")
+                lines.append(
+                    f"{key} -> Scores: {data['scores'][: self.feedback_length]}"
+                )
             if data["errors"]:
-                lines.append(f"{key} -> Errors: {data['errors'][:self.feedback_length]}")
+                lines.append(
+                    f"{key} -> Errors: {data['errors'][: self.feedback_length]}"
+                )
 
         summary = "\n".join(lines[: self.feedback_length])
         summary += f"\nAvg Score {avg_score}"
@@ -217,17 +236,32 @@ class YieldingEvaluator(Evaluator):
     def evaluate(self, code):
         runtime = YieldingParallelRun()
         results = runtime(
-            self.data.test_cases, self.data.task, self.data.load_data, code,
-            self.data.config_path, self.data.src_dir,
-            timeout=self.timeout, instance_workers=self.instance_workers, case_workers=self.case_workers)
+            self.data.test_cases,
+            self.data.task,
+            self.data.load_data,
+            code,
+            self.data.config_path,
+            self.data.src_dir,
+            timeout=self.timeout,
+            instance_workers=self.instance_workers,
+            case_workers=self.case_workers,
+        )
         results = self.data.norm_score(results)
         score = average_score(results, self.data.test_cases)
-        dev_score = average_score(filter_dev(results, self.data.get_dev()), self.data.test_cases)
-        test_score = average_score(filter_test(results, self.data.get_dev()), self.data.test_cases)
+        dev_score = average_score(
+            filter_dev(results, self.data.get_dev()), self.data.test_cases
+        )
+        test_score = average_score(
+            filter_test(results, self.data.get_dev()), self.data.test_cases
+        )
 
         feedback = self.get_feedback(results, dev_score)
-        dev_feedback = self.get_feedback(filter_dev(results, self.data.get_dev()), dev_score)
-        test_feedback = self.get_feedback(filter_test(results, self.data.get_dev()), test_score)
+        dev_feedback = self.get_feedback(
+            filter_dev(results, self.data.get_dev()), dev_score
+        )
+        test_feedback = self.get_feedback(
+            filter_test(results, self.data.get_dev()), test_score
+        )
         return Feedback(
             score=score,
             dev_score=dev_score,
@@ -235,5 +269,5 @@ class YieldingEvaluator(Evaluator):
             feedback=feedback,
             dev_feedback=dev_feedback,
             test_feedback=test_feedback,
-            results=results
+            results=results,
         )
