@@ -120,8 +120,12 @@ def save_heuristic(code: str, run_dir: Path, iteration: int, metadata: dict) -> 
     return filepath
 
 
-def evaluate_heuristic(problem: str, heuristic_path: Path) -> dict:
+def evaluate_heuristic(
+    problem: str, heuristic_path: Path, run_dir: Path, iteration: int
+) -> dict:
     """Evaluate heuristic using evaluate_code.py script."""
+    evaluation_dir = run_dir / "evaluation"
+
     cmd = [
         "python",
         "scripts/evaluate_code.py",
@@ -129,6 +133,10 @@ def evaluate_heuristic(problem: str, heuristic_path: Path) -> dict:
         problem,
         "--code",
         str(heuristic_path),
+        "--output-dir",
+        str(evaluation_dir),
+        "--iteration",
+        str(iteration),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
@@ -165,16 +173,6 @@ def evaluate_heuristic(problem: str, heuristic_path: Path) -> dict:
         "feedback": feedback,
         "raw_output": output,
     }
-
-
-def save_evaluation(evaluation: dict, run_dir: Path, iteration: int) -> Path:
-    """Save evaluation results to JSON file."""
-    filepath = run_dir / "evaluation" / f"eval_{iteration}.json"
-
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(evaluation, f, indent=2)
-
-    return filepath
 
 
 def check_stopping_criteria(
@@ -355,14 +353,12 @@ async def run_agent(
 
                 # Evaluate heuristic
                 logger.info("Evaluating heuristic...")
-                evaluation = evaluate_heuristic(problem, heuristic_path)
+                evaluation = evaluate_heuristic(
+                    problem, heuristic_path, run_dir, iteration
+                )
 
                 # Update heuristic file with evaluation metadata
                 heuristic_path = save_heuristic(code, run_dir, iteration, evaluation)
-
-                # Save evaluation
-                eval_path = save_evaluation(evaluation, run_dir, iteration)
-                logger.info(f"Evaluation saved to {eval_path}")
 
                 # Log results
                 overall_score = evaluation.get("overall_score", 0.0)

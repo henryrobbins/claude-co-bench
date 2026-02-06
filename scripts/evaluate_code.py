@@ -8,10 +8,14 @@ Usage:
 """
 
 import argparse
+import json
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from src.controller import get_new_data, TASK_LIST
-from src.evaluate import Evaluator
+from src.evaluate import Evaluator, Feedback
 
 
 def read_code_from_file(file_path: str) -> str:
@@ -25,6 +29,64 @@ def read_code_from_file(file_path: str) -> str:
     except Exception as e:
         print(f"Error reading code file: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def save_feedback(feedback: Feedback, output_dir: Path, iteration: int) -> Path:
+    """Save evaluation feedback to a text file."""
+    filename = output_dir / f"eval_{iteration}.txt"
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(f"Iteration {iteration}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write("=" * 80 + "\n\n")
+        f.write(f"Overall Score: {feedback.score:.6f}\n")
+        f.write(f"Dev Score: {feedback.dev_score:.6f}\n")
+        f.write(f"Test Score: {feedback.test_score:.6f}\n")
+        f.write("\n" + "=" * 80 + "\n")
+        f.write("DEV FEEDBACK:\n")
+        f.write("=" * 80 + "\n")
+        f.write(feedback.dev_feedback)
+        f.write("\n\n" + "=" * 80 + "\n")
+        f.write("TEST FEEDBACK:\n")
+        f.write("=" * 80 + "\n")
+        f.write(feedback.test_feedback)
+
+    return filename
+
+
+def save_detailed_results(feedback: Feedback, output_dir: Path, iteration: int) -> Path:
+    """Save detailed results as JSON."""
+    filename = output_dir / f"eval_{iteration}.json"
+
+    # Convert results to serializable format
+    results_data = {}
+    for case, (scores, error_msg) in feedback.results.items():
+        results_data[case] = {
+            "scores": [float(s) if not isinstance(s, str) else s for s in scores],
+            "error": error_msg,
+        }
+
+    data = {
+        "iteration": iteration,
+        "timestamp": datetime.now().isoformat(),
+        # Maintain backward compatibility with agent.py expectations
+        "overall_score": float(feedback.score),
+        "dev_score": float(feedback.dev_score),
+        "test_score": float(feedback.test_score),
+        "feedback": feedback.dev_feedback,
+        # New structured format
+        "scores": {
+            "overall": float(feedback.score),
+            "dev": float(feedback.dev_score),
+            "test": float(feedback.test_score),
+        },
+        "detailed_results": results_data,
+    }
+
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    return filename
 
 
 def main() -> None:
@@ -43,6 +105,19 @@ def main() -> None:
         "--code",
         type=str,
         help="Path to file containing the solve function code",
+    )
+
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Directory to save evaluation feedback files (optional)",
+    )
+
+    parser.add_argument(
+        "--iteration",
+        type=int,
+        default=0,
+        help="Iteration number for file naming (default: 0)",
     )
 
     args = parser.parse_args()
@@ -105,6 +180,17 @@ def main() -> None:
         print("\nFeedback:")
         print(feedback.feedback)
         print("\n" + "=" * 80)
+
+        # Save feedback files if output directory is specified
+        if args.output_dir:
+            output_dir = Path(args.output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            feedback_file = save_feedback(feedback, output_dir, args.iteration)
+            json_file = save_detailed_results(feedback, output_dir, args.iteration)
+
+            print(f"\nFeedback saved to: {feedback_file}")
+            print(f"Detailed results saved to: {json_file}")
 
     except Exception as e:
         print(f"Error during evaluation: {e}", file=sys.stderr)
