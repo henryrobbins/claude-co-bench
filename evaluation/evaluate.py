@@ -1,5 +1,6 @@
 # Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/evaluate.py
 
+from evaluation.controller import Data
 from evaluation.utils import (
     FileLock,
     ParallelRun,
@@ -37,7 +38,7 @@ def evaluate_instance(
 class Evaluator:
     def __init__(
         self,
-        data: Any,
+        data: Data,
         timeout: int = 10,
         cpu_num: int | None = None,
         feedback_length: int = 64,

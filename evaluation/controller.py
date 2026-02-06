@@ -1,8 +1,12 @@
 # Adapted from CO-Bench: https://github.com/sunnweiwei/CO-Bench/blob/main/evaluation/controller.py
 
-from evaluation.utils import import_func, extract_function_source, list_test_cases
+import os
+import ast
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Any
+
+from evaluation.utils import import_func
 
 
 @dataclass
@@ -60,6 +64,13 @@ TASK_LIST = [
 ]
 
 
+def list_test_cases(path: str = ".") -> list[str]:
+    return sorted(
+        f for f in os.listdir(path) if not (f.endswith(".py") or f == "__pycache__")
+    )
+
+
+# I believe this is for loading the FrontierCO dataset
 def get_data(task: str, src_dir: str = "data") -> Data:
     load_data, _, problem = import_func(
         f"{src_dir}/{task}/config.py", "load_data", "eval_func", "DESCRIPTION"
@@ -100,9 +111,6 @@ def get_data(task: str, src_dir: str = "data") -> Data:
     )
 
 
-from pathlib import Path
-
-
 def list_new_test_cases(
     path: str = ".", filter_key: list[str] | None = None
 ) -> list[str]:
@@ -129,6 +137,7 @@ def list_new_test_cases(
     )
 
 
+# I believe this is for loading the CO-Bench dataset
 def get_new_data(
     task: str,
     src_dir: str = "data",
@@ -172,3 +181,21 @@ def get_new_data(
         get_dev=get_dev,
         norm_time=norm_time,
     )
+
+
+def extract_function_source(file_path: str, function_name: str) -> str:
+    with open(file_path, "r", encoding="utf-8") as f:
+        source = f.read()
+    tree = ast.parse(source, filename=file_path)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == function_name:
+            start_line = node.lineno - 1
+            if not hasattr(node, "end_lineno"):
+                raise RuntimeError(
+                    "Python 3.8+ is required for this function to work properly."
+                )
+            end_line = node.end_lineno
+            source_lines = source.splitlines()
+            function_source = "\n".join(source_lines[start_line:end_line])
+            return function_source
+    raise ValueError(f"Function '{function_name}' not found in the file '{file_path}'.")

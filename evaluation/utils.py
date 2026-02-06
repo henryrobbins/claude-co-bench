@@ -8,7 +8,6 @@ import textwrap
 import sys
 import io
 import concurrent.futures
-import ast
 import contextlib
 from tqdm import tqdm
 import multiprocessing as mp
@@ -65,12 +64,6 @@ def read_eval_file(file_path: str) -> str:
 
 def list_dirs(path: str = ".") -> list[str]:
     return sorted([d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))])
-
-
-def list_test_cases(path: str = ".") -> list[str]:
-    return sorted(
-        f for f in os.listdir(path) if not (f.endswith(".py") or f == "__pycache__")
-    )
 
 
 class FileLock:
@@ -136,24 +129,6 @@ def extract_and_compile_code(llm_answer: str) -> Callable[..., Any]:
     if "solve" not in namespace or not callable(namespace["solve"]):
         raise ValueError("Extracted code does not contain a valid 'solve' function.")
     return namespace["solve"]
-
-
-def extract_function_source(file_path: str, function_name: str) -> str:
-    with open(file_path, "r", encoding="utf-8") as f:
-        source = f.read()
-    tree = ast.parse(source, filename=file_path)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == function_name:
-            start_line = node.lineno - 1
-            if not hasattr(node, "end_lineno"):
-                raise RuntimeError(
-                    "Python 3.8+ is required for this function to work properly."
-                )
-            end_line = node.end_lineno
-            source_lines = source.splitlines()
-            function_source = "\n".join(source_lines[start_line:end_line])
-            return function_source
-    raise ValueError(f"Function '{function_name}' not found in the file '{file_path}'.")
 
 
 def design_optimal(problem_cases: dict[str, list[Any]], K: int) -> tuple[int, int]:
