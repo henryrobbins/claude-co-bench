@@ -1,0 +1,33 @@
+[project]
+name = "claude-co-bench"
+version = "0.1.0"
+authors = [
+    {name = "Henry Robbins", email = "hw.robbins@gmail.com"}
+]
+description = "Claude CO-Bench evaluation framework"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+extend-ignore = ["E203", "E701"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evaluation"]
+
+[tool.mypy]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
