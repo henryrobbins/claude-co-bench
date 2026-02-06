@@ -83,8 +83,9 @@ def run_yielding_instance_with_timeout(
     Run instance with timeout, collecting yielded solutions from the subprocess.
     After the subprocess finishes or times out, evaluate the last solution.
     """
-    queue = mp.Queue()
-    p = mp.Process(
+    ctx = mp.get_context("fork")
+    queue = ctx.Queue()
+    p = ctx.Process(
         target=evaluate_yielding_instance_in_subprocess,
         args=(instance, solve_source, config_path, queue),
     )

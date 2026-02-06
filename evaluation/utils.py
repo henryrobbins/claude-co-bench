@@ -252,8 +252,9 @@ class ParallelRun:
         # subprocess.run(["cgcreate", "-g", f"cpu,memory:/{cgroup_name}"],
         #                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        queue = mp.Queue()
-        p = mp.Process(
+        ctx = mp.get_context("fork")
+        queue = ctx.Queue()
+        p = ctx.Process(
             target=self.evaluate_instance_in_subprocess,
             args=(instance, solve_source, config_path, queue),
         )
