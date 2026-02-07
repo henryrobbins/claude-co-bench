@@ -19,6 +19,7 @@ from typing import Optional
 
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
 from dotenv import load_dotenv
+from langfuse import get_client
 
 from src.controller import TASK_LIST
 
@@ -105,6 +106,9 @@ async def run_agent(
     run_dir = create_run_directory()
     logger = setup_logging(run_dir)
 
+    # Initialize langfuse
+    langfuse = get_client()
+
     logger.info(f"Starting agent for problem: {problem}")
     logger.info(f"Run directory: {run_dir}")
     logger.info(f"Max turns: {max_turns}")
@@ -141,63 +145,120 @@ async def run_agent(
             f.write(content + "\n")
 
     try:
-        # Run the agent
+        # Run the agent with langfuse tracing
         logger.info("Starting agent conversation...")
 
-        # Log initial prompt
-        write_to_transcript("\n" + "=" * 80)
-        write_to_transcript("USER PROMPT")
-        write_to_transcript("=" * 80)
-        write_to_transcript(initial_prompt)
-        write_to_transcript("")
+        # Create main span for the entire agent run
+        with langfuse.start_as_current_observation(
+            as_type="span",
+            name="agent-run",
+            input={"problem": problem, "max_turns": max_turns, "run_dir": str(run_dir)},
+            metadata={"model": "claude-haiku-4-5"},
+        ) as agent_span:
+            # Log initial prompt
+            write_to_transcript("\n" + "=" * 80)
+            write_to_transcript("USER PROMPT")
+            write_to_transcript("=" * 80)
+            write_to_transcript(initial_prompt)
+            write_to_transcript("")
 
-        async with ClaudeSDKClient(options=options) as client:
-            await client.query(prompt=initial_prompt)
+            async with ClaudeSDKClient(options=options) as client:
+                await client.query(prompt=initial_prompt)
 
-            # Collect all responses
-            turn_count = 0
-            async for msg in client.receive_response():
-                if type(msg).__name__ == "AssistantMessage":
-                    turn_count += 1
-                    logger.info(f"Turn {turn_count} started")
+                # Collect all responses
+                turn_count = 0
+                async for msg in client.receive_response():
+                    if type(msg).__name__ == "AssistantMessage":
+                        turn_count += 1
+                        logger.info(f"Turn {turn_count} started")
 
-                    write_to_transcript("\n" + "=" * 80)
-                    write_to_transcript(f"ASSISTANT TURN {turn_count}")
-                    write_to_transcript("=" * 80)
+                        # Create a nested generation span for each assistant turn
+                        with langfuse.start_as_current_observation(
+                            as_type="generation",
+                            name=f"assistant-turn-{turn_count}",
+                            model="claude-haiku-4-5",
+                            metadata={"turn": turn_count},
+                        ) as turn_generation:
+                            write_to_transcript("\n" + "=" * 80)
+                            write_to_transcript(f"ASSISTANT TURN {turn_count}")
+                            write_to_transcript("=" * 80)
 
-                    for block in msg.content:
-                        if type(block).__name__ == "TextBlock":
-                            # Display full text content
-                            write_to_transcript(block.text)
-                        elif type(block).__name__ == "ToolUseBlock":
-                            # Log tool use
-                            tool_info = f"\n[Tool Use: {block.name}]"
-                            write_to_transcript(tool_info)
-                            write_to_transcript(
-                                f"Input: {json.dumps(block.input, indent=2)}"
-                            )
-
-                    write_to_transcript("")
-                    logger.info(f"Turn {turn_count} completed")
-
-                elif type(msg).__name__ == "ToolResultMessage":
-                    # Log tool results
-                    write_to_transcript("\n" + "-" * 80)
-                    write_to_transcript("TOOL RESULTS")
-                    write_to_transcript("-" * 80)
-                    for block in msg.content:
-                        if type(block).__name__ == "ToolResultBlock":
-                            write_to_transcript(f"\n[Tool: {block.tool_use_id}]")
-                            if hasattr(block, "content"):
-                                if isinstance(block.content, str):
-                                    write_to_transcript(block.content)
-                                else:
-                                    write_to_transcript(
-                                        json.dumps(block.content, indent=2)
+                            turn_output = []
+                            for block in msg.content:
+                                if type(block).__name__ == "TextBlock":
+                                    # Display full text content
+                                    write_to_transcript(block.text)
+                                    turn_output.append(
+                                        {"type": "text", "content": block.text}
                                     )
-                    write_to_transcript("")
+                                elif type(block).__name__ == "ToolUseBlock":
+                                    # Log tool use
+                                    tool_info = f"\n[Tool Use: {block.name}]"
+                                    write_to_transcript(tool_info)
+                                    write_to_transcript(
+                                        f"Input: {json.dumps(block.input, indent=2)}"
+                                    )
+                                    turn_output.append(
+                                        {
+                                            "type": "tool_use",
+                                            "tool": block.name,
+                                            "input": block.input,
+                                        }
+                                    )
 
-            logger.info(f"Agent completed after {turn_count} turns")
+                            write_to_transcript("")
+                            logger.info(f"Turn {turn_count} completed")
+
+                            # Update generation with output
+                            turn_generation.update(output=turn_output)
+
+                    elif type(msg).__name__ == "ToolResultMessage":
+                        # Log tool results with a span
+                        with langfuse.start_as_current_observation(
+                            as_type="span",
+                            name="tool-results",
+                            metadata={"turn": turn_count},
+                        ) as tool_span:
+                            write_to_transcript("\n" + "-" * 80)
+                            write_to_transcript("TOOL RESULTS")
+                            write_to_transcript("-" * 80)
+
+                            tool_results = []
+                            for block in msg.content:
+                                if type(block).__name__ == "ToolResultBlock":
+                                    write_to_transcript(
+                                        f"\n[Tool: {block.tool_use_id}]"
+                                    )
+                                    if hasattr(block, "content"):
+                                        if isinstance(block.content, str):
+                                            write_to_transcript(block.content)
+                                            tool_results.append(
+                                                {
+                                                    "tool_id": block.tool_use_id,
+                                                    "content": block.content,
+                                                }
+                                            )
+                                        else:
+                                            write_to_transcript(
+                                                json.dumps(block.content, indent=2)
+                                            )
+                                            tool_results.append(
+                                                {
+                                                    "tool_id": block.tool_use_id,
+                                                    "content": block.content,
+                                                }
+                                            )
+                            write_to_transcript("")
+
+                            # Update tool span with results
+                            tool_span.update(output=tool_results)
+
+                logger.info(f"Agent completed after {turn_count} turns")
+
+                # Update main span with final output
+                agent_span.update(
+                    output={"total_turns": turn_count, "status": "completed"}
+                )
 
     except Exception as e:
         logger.error(f"Error during agent execution: {e}")
@@ -223,6 +284,9 @@ async def run_agent(
     logger.info(f"Run directory: {run_dir}")
     logger.info(f"Transcript saved to {transcript_path}")
     logger.info(f"Summary saved to {run_dir / 'summary.json'}")
+
+    # Flush langfuse events
+    langfuse.flush()
 
 
 def main() -> None:

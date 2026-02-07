@@ -20,7 +20,8 @@ dependencies = [
     "scipy>=1.17.0",
     "requests>=2.32.3",
     "beautifulsoup4>=4.12.2",
-    "html2text>=2020.1.16"
+    "html2text>=2020.1.16",
+    "langfuse>=3.13.0",
 ]
 
 [dependency-groups]
