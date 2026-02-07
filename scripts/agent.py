@@ -29,13 +29,13 @@ load_dotenv()
 
 def load_system_prompt() -> str:
     """Load the system prompt from the prompts directory."""
-    prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.txt"
+    prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.md"
     return prompt_path.read_text()
 
 
 def load_initial_prompt(problem: str, run_dir: Path) -> str:
     """Load and format the initial prompt from the prompts directory."""
-    prompt_path = Path(__file__).parent.parent / "prompts" / "initial_prompt.txt"
+    prompt_path = Path(__file__).parent.parent / "prompts" / "initial_prompt.md"
     template = prompt_path.read_text()
     return template.format(problem=problem, run_dir=run_dir.absolute())
 
