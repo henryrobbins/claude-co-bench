@@ -15,11 +15,12 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, HookMatcher
 from dotenv import load_dotenv
 from langfuse import get_client
+from langsmith.integrations.claude_agent_sdk import configure_claude_agent_sdk
 
 from src.controller import TASK_LIST
 
@@ -123,17 +124,8 @@ async def run_agent(
     with open(run_dir / "run_config.json", "w") as f:
         json.dump(config, f, indent=2)
 
-    # Configure Claude SDK options
-    options = ClaudeAgentOptions(
-        permission_mode="bypassPermissions",
-        system_prompt=load_system_prompt(),
-        allowed_tools=["Bash", "Read", "Write"],
-        model="claude-haiku-4-5",
-        max_turns=max_turns,
-    )
-
-    # Load initial prompt
-    initial_prompt = load_initial_prompt(problem, run_dir)
+    # State container to share between main loop and hook
+    state = {"turn_count": 0}
 
     # Open transcript log file
     transcript_path = run_dir / "transcript.log"
@@ -143,6 +135,59 @@ async def run_agent(
         print(content)
         with open(transcript_path, "a", encoding="utf-8") as f:
             f.write(content + "\n")
+
+    async def log_tool_results_hook(
+        input_data: dict,
+        tool_use_id: str | None,
+        context: Any,
+    ) -> dict:
+        """Capture tool results and log to transcript file."""
+        tool_name = input_data.get("tool_name")
+        tool_response = input_data.get("tool_response")
+
+        write_to_transcript("\n" + "-" * 80)
+        write_to_transcript("TOOL RESULT")
+        write_to_transcript("-" * 80)
+        write_to_transcript(f"\n[Tool: {tool_name}]")
+        if tool_use_id:
+            write_to_transcript(f"Tool Use ID: {tool_use_id}")
+
+        # Log the actual response
+        if isinstance(tool_response, str):
+            write_to_transcript(tool_response)
+        else:
+            write_to_transcript(json.dumps(tool_response, indent=2))
+
+        write_to_transcript("")
+
+        # Also log to Langfuse span
+        with langfuse.start_as_current_observation(
+            as_type="span",
+            name="tool-result",
+            metadata={"tool": tool_name, "turn": state["turn_count"]},
+        ) as tool_span:
+            tool_span.update(
+                input=input_data.get("tool_input"),
+                output=tool_response,
+            )
+
+        return {}  # Don't modify anything
+
+    # Configure Claude SDK options
+    options = ClaudeAgentOptions(
+        permission_mode="bypassPermissions",
+        system_prompt=load_system_prompt(),
+        allowed_tools=["Bash", "Read", "Write"],
+        model="claude-haiku-4-5",
+        max_turns=max_turns,
+        hooks={"PostToolUse": [HookMatcher(hooks=[log_tool_results_hook])]},
+    )
+
+    # Load initial prompt
+    initial_prompt = load_initial_prompt(problem, run_dir)
+
+    # Initialize OpenTelemetry instrumentation
+    configure_claude_agent_sdk()
 
     try:
         # Run the agent with langfuse tracing
@@ -166,21 +211,20 @@ async def run_agent(
                 await client.query(prompt=initial_prompt)
 
                 # Collect all responses
-                turn_count = 0
                 async for msg in client.receive_response():
                     if type(msg).__name__ == "AssistantMessage":
-                        turn_count += 1
-                        logger.info(f"Turn {turn_count} started")
+                        state["turn_count"] += 1
+                        logger.info(f"Turn {state['turn_count']} started")
 
                         # Create a nested generation span for each assistant turn
                         with langfuse.start_as_current_observation(
                             as_type="generation",
-                            name=f"assistant-turn-{turn_count}",
+                            name=f"assistant-turn-{state['turn_count']}",
                             model="claude-haiku-4-5",
-                            metadata={"turn": turn_count},
+                            metadata={"turn": state["turn_count"]},
                         ) as turn_generation:
                             write_to_transcript("\n" + "=" * 80)
-                            write_to_transcript(f"ASSISTANT TURN {turn_count}")
+                            write_to_transcript(f"ASSISTANT TURN {state['turn_count']}")
                             write_to_transcript("=" * 80)
 
                             turn_output = []
@@ -207,57 +251,16 @@ async def run_agent(
                                     )
 
                             write_to_transcript("")
-                            logger.info(f"Turn {turn_count} completed")
+                            logger.info(f"Turn {state['turn_count']} completed")
 
                             # Update generation with output
                             turn_generation.update(output=turn_output)
 
-                    elif type(msg).__name__ == "ToolResultMessage":
-                        # Log tool results with a span
-                        with langfuse.start_as_current_observation(
-                            as_type="span",
-                            name="tool-results",
-                            metadata={"turn": turn_count},
-                        ) as tool_span:
-                            write_to_transcript("\n" + "-" * 80)
-                            write_to_transcript("TOOL RESULTS")
-                            write_to_transcript("-" * 80)
-
-                            tool_results = []
-                            for block in msg.content:
-                                if type(block).__name__ == "ToolResultBlock":
-                                    write_to_transcript(
-                                        f"\n[Tool: {block.tool_use_id}]"
-                                    )
-                                    if hasattr(block, "content"):
-                                        if isinstance(block.content, str):
-                                            write_to_transcript(block.content)
-                                            tool_results.append(
-                                                {
-                                                    "tool_id": block.tool_use_id,
-                                                    "content": block.content,
-                                                }
-                                            )
-                                        else:
-                                            write_to_transcript(
-                                                json.dumps(block.content, indent=2)
-                                            )
-                                            tool_results.append(
-                                                {
-                                                    "tool_id": block.tool_use_id,
-                                                    "content": block.content,
-                                                }
-                                            )
-                            write_to_transcript("")
-
-                            # Update tool span with results
-                            tool_span.update(output=tool_results)
-
-                logger.info(f"Agent completed after {turn_count} turns")
+                logger.info(f"Agent completed after {state['turn_count']} turns")
 
                 # Update main span with final output
                 agent_span.update(
-                    output={"total_turns": turn_count, "status": "completed"}
+                    output={"total_turns": state["turn_count"], "status": "completed"}
                 )
 
     except Exception as e:
@@ -272,7 +275,7 @@ async def run_agent(
         "problem": problem,
         "max_turns": max_turns,
         "end_time": datetime.now().isoformat(),
-        "total_turns": turn_count,
+        "total_turns": state["turn_count"],
     }
 
     with open(run_dir / "summary.json", "w") as f:
